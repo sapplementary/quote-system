@@ -1,5 +1,5 @@
 from fastapi import FastAPI, Depends, HTTPException
-from sqlmodel import Session, select
+from sqlmodel import Session, select, or_
 from typing import List
 from sqlalchemy import func
 
@@ -30,14 +30,48 @@ def get_random_quote(session: Session = Depends(get_session)):
     if not result:
         raise HTTPException(status_code=404, detail="В базе пока нет цитат")
     
-    # 4. Формируем красивый ответ, включая имя автора
-    # Благодаря Relationship в моделях, мы можем просто написать result.author.name
+    '''4. Формируем красивый ответ, включая имя автора
+    Благодаря Relationship в моделях, мы можем просто написать result.author.name'''
     return {
         "id": result.id,
         "text": result.text,
         "author": result.author.name,
         "category": result.category
     }
+
+'''ЭНДПОИНТ: ПОИСК ЦИТАТ'''
+
+@app.get("/quotes/search")
+def search_quotes(query: str, session: Session = Depends(get_session)):
+    '''1. Формируем запрос с объединением таблиц (JOIN)
+    Мы выбираем Цитату, но присоединяем к ней Автора'''
+    statement = (
+        select(Quote)
+        .join(Author)
+        .where(
+            or_(
+                Quote.text.contains(query),   # Ищем в тексте цитаты
+                Author.name.contains(query)   # ИЛИ в имени автора
+            )
+        )
+    )
+    
+    # 2. Выполняем запрос
+    results = session.exec(statement).all()
+    
+    # 3. Если ничего не нашли — возвращаем пустой список (это нормально для поиска)
+    if not results:
+        return []
+    
+    # 4. Преобразуем результаты в красивый список
+    return [
+        {
+            "id": q.id,
+            "text": q.text,
+            "author": q.author.name,
+            "category": q.category
+        } for q in results
+    ]
 
 '''ЭНДПОИНТЫ ДЛЯ АВТОРОВ'''
 
