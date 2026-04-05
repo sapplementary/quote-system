@@ -1,6 +1,7 @@
 from fastapi import FastAPI, Depends, HTTPException
 from sqlmodel import Session, select
 from typing import List
+from sqlalchemy import func
 
 '''Импортируем наши инструменты из соседних файлов
 Точка перед именем означает "в этой же папке" '''
@@ -15,10 +16,33 @@ app = FastAPI(title="Quotes Management System")
 def on_startup():
     create_db_and_tables()
 
+'''ЭНДПОИНТ: СЛУЧАЙНАЯ ЦИТАТА'''
+
+@app.get("/quotes/random")
+def get_random_quote(session: Session = Depends(get_session)):
+    # 1. Формируем запрос: Выбрать Цитату, отсортировать случайно, взять 1 штуку
+    statement = select(Quote).order_by(func.random()).limit(1)
+    
+    # 2. Выполняем запрос
+    result = session.exec(statement).first()
+    
+    # 3. Если в базе вообще нет цитат — выдаем ошибку
+    if not result:
+        raise HTTPException(status_code=404, detail="В базе пока нет цитат")
+    
+    # 4. Формируем красивый ответ, включая имя автора
+    # Благодаря Relationship в моделях, мы можем просто написать result.author.name
+    return {
+        "id": result.id,
+        "text": result.text,
+        "author": result.author.name,
+        "category": result.category
+    }
+
 '''ЭНДПОИНТЫ ДЛЯ АВТОРОВ'''
 
-# 1. Создание автора (POST запрос)
-# Мы просим FastAPI дать нам session через Depends(get_session)
+'''1. Создание автора (POST запрос)
+Мы просим FastAPI дать нам session через Depends(get_session)'''
 @app.post("/authors/", response_model=Author)
 def create_author(author: Author, session: Session = Depends(get_session)):
     # Добавляем объект автора в очередь на сохранение
@@ -29,7 +53,8 @@ def create_author(author: Author, session: Session = Depends(get_session)):
     session.refresh(author)
     return author
 
-# 2. Получение списка всех авторов (GET запрос)
+'''2. Получение списка всех авторов (GET запрос)'''
+
 @app.get("/authors/", response_model=List[Author])
 def read_authors(session: Session = Depends(get_session)):
     # Формируем SQL-запрос: SELECT * FROM author
@@ -43,7 +68,7 @@ def read_authors(session: Session = Depends(get_session)):
 def read_root():
     return {"message": "Welcome to Quotes API"}
 
-# 3. Создание цитаты (POST)
+'''3. Создание цитаты (POST)'''
 @app.post("/quotes/", response_model=Quote)
 def create_quote(quote: Quote, session: Session = Depends(get_session)):
     # Проверка: существует ли такой автор?
@@ -57,7 +82,7 @@ def create_quote(quote: Quote, session: Session = Depends(get_session)):
     session.refresh(quote)
     return quote
 
-# 4. Получение списка всех цитат (GET)
+'''4. Получение списка всех цитат (GET)'''
 @app.get("/quotes/", response_model=List[Quote])
 def read_quotes(session: Session = Depends(get_session)):
     statement = select(Quote)
