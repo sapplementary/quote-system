@@ -42,3 +42,24 @@ def read_authors(session: Session = Depends(get_session)):
 @app.get("/")
 def read_root():
     return {"message": "Welcome to Quotes API"}
+
+# 3. Создание цитаты (POST)
+@app.post("/quotes/", response_model=Quote)
+def create_quote(quote: Quote, session: Session = Depends(get_session)):
+    # Проверка: существует ли такой автор?
+    db_author = session.get(Author, quote.author_id)
+    if not db_author:
+        # Если автора нет, возвращаем ошибку 404
+        raise HTTPException(status_code=404, detail="Author not found")
+    
+    session.add(quote)
+    session.commit()
+    session.refresh(quote)
+    return quote
+
+# 4. Получение списка всех цитат (GET)
+@app.get("/quotes/", response_model=List[Quote])
+def read_quotes(session: Session = Depends(get_session)):
+    statement = select(Quote)
+    quotes = session.exec(statement).all()
+    return quotes
