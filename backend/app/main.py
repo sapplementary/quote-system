@@ -1,5 +1,5 @@
 from fastapi import FastAPI, Depends, HTTPException
-from sqlmodel import Session, select, or_
+from sqlmodel import Session, select, or_, col  # Добавили col
 from typing import List
 from sqlalchemy import func
 
@@ -21,7 +21,7 @@ def on_startup():
 @app.get("/quotes/random")
 def get_random_quote(session: Session = Depends(get_session)):
     # 1. Формируем запрос: Выбрать Цитату, отсортировать случайно, взять 1 штуку
-    statement = select(Quote).order_by(func.random()).limit(1)
+    statement = select(Quote).order_by(func.random()).limit(1) # type: ignore
     
     # 2. Выполняем запрос
     result = session.exec(statement).first()
@@ -42,16 +42,15 @@ def get_random_quote(session: Session = Depends(get_session)):
 '''ЭНДПОИНТ: ПОИСК ЦИТАТ'''
 
 @app.get("/quotes/search")
+@app.get("/quotes/search")
 def search_quotes(query: str, session: Session = Depends(get_session)):
-    '''1. Формируем запрос с объединением таблиц (JOIN)
-    Мы выбираем Цитату, но присоединяем к ней Автора'''
     statement = (
         select(Quote)
         .join(Author)
         .where(
             or_(
-                Quote.text.contains(query),   # Ищем в тексте цитаты
-                Author.name.contains(query)   # ИЛИ в имени автора
+                col(Quote.text).contains(query),   # Обернули в col()
+                col(Author.name).contains(query)   # Обернули в col()
             )
         )
     )
