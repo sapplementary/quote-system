@@ -22,6 +22,7 @@ function App() {
   const [searchResults, setSearchResults] = useState([]);
   const [query, setQuery] = useState("");
   const [authors, setAuthors] = useState([]); // Для выпадающего списка в форме
+  const ADMIN_TOKEN = "mysecret123";
   
   // Состояния для форм добавления
   const [newAuthor, setNewAuthor] = useState({ name: "", bio: "" });
@@ -66,30 +67,38 @@ function App() {
   };
 
   // Создание автора
-  const handleCreateAuthor = async (e) => {
-    e.preventDefault();
-    try {
-      await axios.post('http://localhost:8000/authors/', newAuthor);
-      alert("Автор успешно добавлен!");
-      setNewAuthor({ name: "", bio: "" });
-      fetchAuthors(); // Обновляем список авторов в выпадающем меню
-    } catch (e) {
-      alert(e.response?.data?.detail || "Ошибка при создании автора");
-    }
-  };
+ const handleCreateAuthor = async (e) => {
+  e.preventDefault();
+  try {
+    await axios.post('http://localhost:8000/authors/', newAuthor, {
+      headers: {
+        'X-Admin-Token': ADMIN_TOKEN // Отправляем ключ в заголовке
+      }
+    });
+    alert("Автор успешно добавлен!");
+    setNewAuthor({ name: "", bio: "" });
+    fetchAuthors();
+  } catch (e) {
+    alert("Ошибка: " + (e.response?.data?.detail || "Доступ запрещен"));
+  }
+};
 
   // Создание цитаты
   const handleCreateQuote = async (e) => {
-    e.preventDefault();
-    try {
-      await axios.post('http://localhost:8000/quotes/', newQuote);
-      alert("Цитата успешно добавлена!");
-      setNewQuote({ text: "", author_id: "", category: "Общее" });
-      fetchRandomQuote(); // Обновляем главную цитату
-    } catch (e) {
-      alert("Ошибка при создании цитаты. Проверьте, выбран ли автор.");
-    }
-  };
+  e.preventDefault();
+  try {
+    await axios.post('http://localhost:8000/quotes/', newQuote, {
+      headers: {
+        'X-Admin-Token': ADMIN_TOKEN // Отправляем ключ в заголовке
+      }
+    });
+    alert("Цитата успешно добавлена!");
+    setNewQuote({ text: "", author_id: "", category: "Общее" });
+    fetchRandomQuote();
+  } catch (e) {
+    alert("Ошибка: " + (e.response?.data?.detail || "Доступ запрещен"));
+  }
+};
 
   // Загрузка данных при первом открытии сайта
   useEffect(() => {
