@@ -1,4 +1,5 @@
 from fastapi import FastAPI, Depends, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
 from sqlmodel import Session, select, or_, col  # Добавили col
 from typing import List
 from sqlalchemy import func
@@ -10,6 +11,18 @@ from .database import engine, get_session, create_db_and_tables
 from .models import Author, Quote
 
 app = FastAPI(title="Quotes Management System")
+
+app.add_middleware(
+    CORSMiddleware,
+    # Список адресов, которым мы доверяем (твой фронтенд)
+    allow_origins=[
+        "http://localhost:5173",
+        "http://127.0.0.1:5173", # На всякий случай добавляем и этот адрес
+    ],
+    allow_credentials=True,
+    allow_methods=["*"], # Разрешить все методы (GET, POST, и т.д.)
+    allow_headers=["*"], # Разрешить все заголовки
+)
 
 # Создаем таблицы при старте (мы это уже делали, оставляем для надежности)
 @app.on_event("startup")
@@ -49,8 +62,8 @@ def search_quotes(query: str, session: Session = Depends(get_session)):
         .join(Author)
         .where(
             or_(
-                col(Quote.text).contains(query),   # Обернули в col()
-                col(Author.name).contains(query)   # Обернули в col()
+                col(Quote.text).ilike(f"%{query}%"),
+                col(Author.name).ilike(f"%{query}%")
             )
         )
     )
