@@ -153,3 +153,4 @@ def read_quotes(session: Session = Depends(get_session)):
     statement = select(Quote)
     quotes = session.exec(statement).all()
     return quotes
+    

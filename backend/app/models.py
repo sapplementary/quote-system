@@ -27,3 +27,4 @@ class Quote(SQLModel, table=True):
     
     # Позволяет обращаться к объекту автора прямо из цитаты (quote.author.name)
     author: Optional[Author] = Relationship(back_populates="quotes")
+    
