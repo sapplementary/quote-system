@@ -163,7 +163,6 @@ function App() {
 
         {/* СЕКЦИЯ 3: АДМИН-ПАНЕЛЬ */}
         <section className="pt-12 border-t-2 border-dashed border-gray-200">
-          <h2 className="text-2xl font-bold text-gray-800 mb-8">🛠 Панель управления</h2>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
             
             {/* Форма создания автора */}
@@ -217,9 +216,7 @@ function App() {
           </div>
         </section>
 
-        <footer className="text-center text-gray-400 text-sm pb-8">
-          Fullstack Quote System © 2026 | FastAPI + PostgreSQL + React
-        </footer>
+        
       </div>
     </div>
   );
