@@ -1,29 +1,16 @@
-from typing import List, Optional
 import os
+from contextlib import asynccontextmanager
+from typing import List, Optional
 from fastapi import FastAPI, Depends, HTTPException, Header
 from fastapi.middleware.cors import CORSMiddleware
 from sqlmodel import Session, select, or_, col
-from sqlalchemy import func, text
+from sqlalchemy import func
 
 from .database import engine, get_session, create_db_and_tables
 from .models import Author, Quote
 
-app = FastAPI(title="Quotes Management System")
-
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=[
-        "http://localhost:5173",
-        "http://127.0.0.1:5173",
-    ],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
-
 def check_admin_token(x_admin_token: str = Header(None)):
     correct_token = os.getenv("ADMIN_TOKEN")
-    
     if x_admin_token != correct_token:
         raise HTTPException(
             status_code=403, 
@@ -31,9 +18,26 @@ def check_admin_token(x_admin_token: str = Header(None)):
         )
     return True
 
-@app.on_event("startup")
-def on_startup():
+@asynccontextmanager
+async def lifespan(app: FastAPI):
     create_db_and_tables()
+    yield
+    pass
+
+
+app = FastAPI(title="Quotes Management System", lifespan=lifespan)
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["http://localhost:5173", "http://127.0.0.1:5173"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+@app.get("/")
+def read_root():
+    return {"message": "API is working"}
 
 @app.get("/quotes/random")
 def get_random_quote(session: Session = Depends(get_session)):
@@ -56,7 +60,6 @@ def get_random_quote(session: Session = Depends(get_session)):
         "author": result.author.name,
         "category": result.category
     }
-
 
 @app.get("/quotes/search")
 def search_quotes(query: str, session: Session = Depends(get_session)):
@@ -148,7 +151,7 @@ def read_quotes(session: Session = Depends(get_session)):
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run(
-        "app.main:app",
+        "backend.app.main:app",
         host="0.0.0.0",
         port=8000,
         reload=True

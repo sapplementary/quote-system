@@ -1,58 +1,72 @@
 import { useState, useEffect } from 'react';
 import axios from 'axios';
 
-// --- ВСПОМОГАТЕЛЬНЫЙ КОМПОНЕНТ: КАРТОЧКА ЦИТАТЫ ---
-// Используется для отображения результатов поиска
-const QuoteCard = ({ quote }) => (
-  <div className="bg-white rounded-xl shadow-md p-6 border-l-4 border-indigo-500 hover:shadow-lg transition-shadow">
-    <p className="text-lg italic text-gray-800 mb-4">«{quote.text}»</p>
-    <div className="flex justify-between items-center border-t pt-3">
-      <span className="font-bold text-indigo-700">{quote.author}</span>
-      <span className="text-xs bg-indigo-100 text-indigo-600 px-2 py-1 rounded">
-        {quote.category}
-      </span>
-    </div>
+// --- КОМПОНЕНТ КАРТОЧКИ ЦИТАТЫ ---
+const QuoteCard = ({ quote, onToggleFavorite, isFavorite }) => (
+  <div className="glass rounded-[2.5rem] p-8 hover:scale-[1.01] transition-all duration-500 shadow-sm relative group">
+    {/* Кнопка сохранения */}
+    <button 
+      onClick={() => onToggleFavorite(quote)}
+      className={`absolute top-6 right-6 w-10 h-10 rounded-full flex items-center justify-center transition-all ${isFavorite ? 'bg-amber-400 text-white' : 'bg-gray-100 dark:bg-zinc-800 text-gray-400 opacity-0 group-hover:opacity-100'}`}
+    >
+      {isFavorite ? '★' : '☆'}
+    </button>
+
+    <p className="text-xl md:text-2xl font-semibold tracking-tight leading-tight mb-6 pr-8">
+      {quote.text}
+    </p>
+    <p className="text-[10px] font-black uppercase tracking-[0.2em] text-zinc-400">{quote.author}</p>
   </div>
 );
 
-// --- ОСНОВНОЙ КОМПОНЕНТ ПРИЛОЖЕНИЯ ---
 function App() {
-  // 1. СОСТОЯНИЯ (STATES)
+  const ADMIN_TOKEN = "supersecret123";
+  const [isDark, setIsDark] = useState(true);
+  
+  // СОСТОЯНИЯ
   const [randomQuote, setRandomQuote] = useState(null);
   const [searchResults, setSearchResults] = useState([]);
   const [query, setQuery] = useState("");
-  const [authors, setAuthors] = useState([]); // Для выпадающего списка в форме
-  const ADMIN_TOKEN = "mysecret123";
+  const [authors, setAuthors] = useState([]);
   
-  // Состояния для форм добавления
-  const [newAuthor, setNewAuthor] = useState({ name: "", bio: "" });
-  const [newQuote, setNewQuote] = useState({ text: "", author_id: "", category: "Общее" });
+  // ИЗБРАННОЕ (загружаем из памяти браузера при старте)
+  const [favorites, setFavorites] = useState(() => {
+    const saved = localStorage.getItem('my-quotes');
+    return saved ? JSON.parse(saved) : [];
+  });
 
-  // 2. ЗАГРУЗКА ДАННЫХ (API CALLS)
-  
-  // Получить случайную цитату
+  const [newAuthor, setNewAuthor] = useState({ name: "", bio: "" });
+  const [newQuote, setNewQuote] = useState({ text: "", author_id: "", category: "General" });
+
+  // Эффект для сохранения в LocalStorage при каждом изменении favorites
+  useEffect(() => {
+    localStorage.setItem('my-quotes', JSON.stringify(favorites));
+  }, [favorites]);
+
+  const toggleFavorite = (quote) => {
+    const exists = favorites.find(f => f.text === quote.text);
+    if (exists) {
+      setFavorites(favorites.filter(f => f.text !== quote.text));
+    } else {
+      setFavorites([...favorites, quote]);
+    }
+  };
+
+  // API Функции
   const fetchRandomQuote = async () => {
     try {
       const response = await axios.get('http://localhost:8000/quotes/random');
       setRandomQuote(response.data);
-    } catch (e) {
-      console.error("Ошибка при получении случайной цитаты:", e);
-    }
+    } catch (e) { console.error(e); }
   };
 
-  // Получить всех авторов
   const fetchAuthors = async () => {
     try {
       const response = await axios.get('http://localhost:8000/authors/');
       setAuthors(response.data);
-    } catch (e) {
-      console.error("Ошибка при получении списка авторов:", e);
-    }
+    } catch (e) { console.error(e); }
   };
 
-  // 3. ОБРАБОТЧИКИ СОБЫТИЙ (HANDLERS)
-
-  // Поиск (срабатывает при вводе)
   const handleSearch = async (e) => {
     const value = e.target.value;
     setQuery(value);
@@ -61,163 +75,134 @@ function App() {
         const response = await axios.get(`http://localhost:8000/quotes/search?query=${value}`);
         setSearchResults(response.data);
       } catch (e) { console.error(e); }
-    } else {
-      setSearchResults([]);
-    }
+    } else { setSearchResults([]); }
   };
 
-  // Создание автора
- const handleCreateAuthor = async (e) => {
-  e.preventDefault();
-  try {
-    await axios.post('http://localhost:8000/authors/', newAuthor, {
-      headers: {
-        'X-Admin-Token': ADMIN_TOKEN // Отправляем ключ в заголовке
-      }
-    });
-    alert("Автор успешно добавлен!");
-    setNewAuthor({ name: "", bio: "" });
-    fetchAuthors();
-  } catch (e) {
-    alert("Ошибка: " + (e.response?.data?.detail || "Доступ запрещен"));
-  }
-};
-
-  // Создание цитаты
-  const handleCreateQuote = async (e) => {
-  e.preventDefault();
-  try {
-    await axios.post('http://localhost:8000/quotes/', newQuote, {
-      headers: {
-        'X-Admin-Token': ADMIN_TOKEN // Отправляем ключ в заголовке
-      }
-    });
-    alert("Цитата успешно добавлена!");
-    setNewQuote({ text: "", author_id: "", category: "Общее" });
-    fetchRandomQuote();
-  } catch (e) {
-    alert("Ошибка: " + (e.response?.data?.detail || "Доступ запрещен"));
-  }
-};
-
-  // Загрузка данных при первом открытии сайта
   useEffect(() => {
     fetchRandomQuote();
     fetchAuthors();
   }, []);
 
-  // 4. ВЕРСТКА (UI)
+  useEffect(() => {
+    if (isDark) document.documentElement.classList.add('dark');
+    else document.documentElement.classList.remove('dark');
+  }, [isDark]);
+
   return (
-    <div className="min-h-screen bg-gray-50 p-4 md:p-8 font-sans">
-      <div className="max-w-5xl mx-auto space-y-12">
+    <div className="min-h-screen w-full">
+      <button 
+        onClick={() => setIsDark(!isDark)}
+        className="fixed top-8 right-8 z-50 w-12 h-12 rounded-full glass flex items-center justify-center text-xl shadow-2xl active:scale-90 transition-all"
+      >
+        {isDark ? '☀️' : '🌙'}
+      </button>
+
+      <main className="max-w-4xl mx-auto px-6 pt-32 pb-40 space-y-32">
         
-        {/* СЕКЦИЯ 1: ГЛАВНАЯ ЦИТАТА */}
-        <section className="text-center space-y-6">
-          <h1 className="text-4xl font-black text-gray-900 uppercase tracking-tighter">
-            Система <span className="text-indigo-600">Цитат</span>
-          </h1>
-          {randomQuote ? (
-            <div className="bg-indigo-900 text-white rounded-3xl p-8 shadow-2xl relative overflow-hidden transition-all">
-              <div className="relative z-10">
-                <p className="text-2xl md:text-3xl font-serif italic mb-6">
-                  "{randomQuote.text}"
-                </p>
-                <p className="text-xl font-bold text-indigo-200">— {randomQuote.author}</p>
+        {/* HERO */}
+        <section className="text-center relative">
+          {randomQuote && (
+            <div className="animate-in fade-in slide-in-from-bottom-10 duration-1000">
+              <h1 className="text-4xl md:text-7xl font-bold tracking-tighter leading-[1] mb-12">
+                {randomQuote.text}
+              </h1>
+              <p className="text-xs font-black uppercase tracking-[0.4em] text-zinc-500 mb-12">{randomQuote.author}</p>
+              
+              <div className="flex justify-center gap-4">
                 <button 
                   onClick={fetchRandomQuote}
-                  className="mt-6 bg-white text-indigo-900 px-8 py-2 rounded-full font-bold hover:bg-indigo-100 transition"
+                  className="px-10 py-4 bg-black dark:bg-white text-white dark:text-black rounded-full font-bold hover:scale-105 transition-all shadow-2xl"
                 >
-                  Следующая мудрость
+                  Random quote
+                </button>
+                <button 
+                  onClick={() => toggleFavorite(randomQuote)}
+                  className={`w-14 h-14 rounded-full border border-zinc-200 dark:border-zinc-800 flex items-center justify-center text-xl transition-all ${favorites.find(f => f.text === randomQuote.text) ? 'bg-amber-400 border-none text-white' : ''}`}
+                >
+                  ★
                 </button>
               </div>
-              <div className="absolute -bottom-4 -right-4 text-9xl text-indigo-800 font-serif opacity-30">“</div>
-            </div>
-          ) : (
-            <p>Загрузка мудрости...</p>
-          )}
-        </section>
-
-        {/* СЕКЦИЯ 2: ПОИСК */}
-        <section className="space-y-6">
-          <div className="relative">
-            <input
-              type="text"
-              placeholder="Поиск по цитате или автору..."
-              value={query}
-              onChange={handleSearch}
-              className="w-full p-5 pl-12 rounded-2xl border-none shadow-lg focus:ring-2 focus:ring-indigo-500 text-lg"
-            />
-            <span className="absolute left-4 top-5 text-2xl">🔍</span>
-          </div>
-
-          {query.length > 2 && (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              {searchResults.length > 0 ? (
-                searchResults.map((q) => <QuoteCard key={q.id} quote={q} />)
-              ) : (
-                <p className="text-gray-500 col-span-full text-center">Ничего не найдено...</p>
-              )}
             </div>
           )}
         </section>
 
-        {/* СЕКЦИЯ 3: АДМИН-ПАНЕЛЬ */}
-        <section className="pt-12 border-t-2 border-dashed border-gray-200">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-            
-            {/* Форма создания автора */}
-            <form onSubmit={handleCreateAuthor} className="bg-white p-6 rounded-2xl shadow-md space-y-4">
-              <h3 className="font-bold text-indigo-600 uppercase text-sm tracking-wider">Новый автор</h3>
-              <input
-                type="text"
-                placeholder="Имя автора"
-                className="w-full p-3 bg-gray-50 rounded-lg border-none ring-1 ring-gray-200 focus:ring-2 focus:ring-indigo-500"
-                value={newAuthor.name}
-                onChange={(e) => setNewAuthor({...newAuthor, name: e.target.value})}
-                required
-              />
-              <textarea
-                placeholder="Краткая биография"
-                className="w-full p-3 bg-gray-50 rounded-lg border-none ring-1 ring-gray-200 focus:ring-2 focus:ring-indigo-500"
-                value={newAuthor.bio}
-                onChange={(e) => setNewAuthor({...newAuthor, bio: e.target.value})}
-              />
-              <button className="w-full bg-indigo-600 text-white py-2 rounded-lg font-bold hover:bg-indigo-700 transition">
-                Создать автора
-              </button>
-            </form>
-
-            {/* Форма создания цитаты */}
-            <form onSubmit={handleCreateQuote} className="bg-white p-6 rounded-2xl shadow-md space-y-4">
-              <h3 className="font-bold text-green-600 uppercase text-sm tracking-wider">Новая цитата</h3>
-              <select
-                className="w-full p-3 bg-gray-50 rounded-lg border-none ring-1 ring-gray-200 focus:ring-2 focus:ring-green-500"
-                value={newQuote.author_id}
-                onChange={(e) => setNewQuote({...newQuote, author_id: e.target.value})}
-                required
-              >
-                <option value="">Выберите автора из базы</option>
-                {authors.map(a => (
-                  <option key={a.id} value={a.id}>{a.name}</option>
+        {/* ИЗБРАННОЕ (показывается только если есть сохраненные) */}
+        {favorites.length > 0 && (
+          <section className="space-y-10 animate-in fade-in duration-700">
+             <div className="flex items-center gap-4">
+               <div className="h-px flex-1 bg-zinc-200 dark:bg-zinc-800"></div>
+               <span className="text-[10px] font-black uppercase tracking-[0.3em] text-zinc-400">Favorites</span>
+               <div className="h-px flex-1 bg-zinc-200 dark:bg-zinc-800"></div>
+             </div>
+             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                {favorites.map((q, idx) => (
+                  <QuoteCard 
+                    key={idx} 
+                    quote={q} 
+                    isFavorite={true} 
+                    onToggleFavorite={toggleFavorite} 
+                  />
                 ))}
-              </select>
-              <textarea
-                placeholder="Текст цитаты"
-                className="w-full p-3 bg-gray-50 rounded-lg border-none ring-1 ring-gray-200 focus:ring-2 focus:ring-green-500"
-                value={newQuote.text}
-                onChange={(e) => setNewQuote({...newQuote, text: e.target.value})}
-                required
-              />
-              <button className="w-full bg-green-600 text-white py-2 rounded-lg font-bold hover:bg-green-700 transition">
-                Опубликовать
-              </button>
-            </form>
+             </div>
+          </section>
+        )}
 
+        {/* ПОИСК */}
+        <section className="space-y-12">
+          <input
+            type="text"
+            placeholder="Search"
+            value={query}
+            onChange={handleSearch}
+            className="w-full py-8 px-12 glass rounded-[2.5rem] border-none focus:ring-2 focus:ring-indigo-500 transition-all outline-none text-2xl text-center placeholder:text-zinc-500"
+          />
+          <div className="grid grid-cols-1 gap-8">
+            {searchResults.map((q) => (
+              <QuoteCard 
+                key={q.id} 
+                quote={q} 
+                isFavorite={favorites.find(f => f.text === q.text)} 
+                onToggleFavorite={toggleFavorite}
+              />
+            ))}
           </div>
         </section>
 
-        
-      </div>
+        {/* ADMIN (Формы добавления) */}
+        <section className="grid grid-cols-1 md:grid-cols-2 gap-12 pt-20 border-t border-zinc-200 dark:border-zinc-800 opacity-20 hover:opacity-100 transition-opacity">
+           {/* Код форм добавления автора и цитаты остается таким же, как был ранее */}
+           <form onSubmit={async (e) => {
+              e.preventDefault();
+              try {
+                await axios.post('http://localhost:8000/authors/', newAuthor, { headers: { 'X-Admin-Token': ADMIN_TOKEN } });
+                setNewAuthor({ name: "", bio: "" });
+                fetchAuthors();
+                alert("Saved");
+              } catch (e) { alert("Error"); }
+           }} className="space-y-4">
+              <input type="text" placeholder="Author Name" className="w-full bg-transparent border-b border-zinc-300 dark:border-zinc-700 py-4 text-xl focus:border-indigo-500 outline-none transition-all" value={newAuthor.name} onChange={(e) => setNewAuthor({...newAuthor, name: e.target.value})} required />
+              <button className="text-[10px] font-black uppercase tracking-widest text-indigo-500">Add Person</button>
+           </form>
+
+           <form onSubmit={async (e) => {
+              e.preventDefault();
+              try {
+                await axios.post('http://localhost:8000/quotes/', newQuote, { headers: { 'X-Admin-Token': ADMIN_TOKEN } });
+                setNewQuote({ text: "", author_id: "", category: "General" });
+                fetchRandomQuote();
+                alert("Saved");
+              } catch (e) { alert("Error"); }
+           }} className="space-y-4">
+              <select className="w-full bg-transparent border-b border-zinc-300 dark:border-zinc-700 py-4 text-xl focus:border-indigo-500 outline-none transition-all" value={newQuote.author_id} onChange={(e) => setNewQuote({...newQuote, author_id: e.target.value})} required>
+                <option value="" className="dark:text-black">Select Author</option>
+                {authors.map(a => <option key={a.id} value={a.id} className="dark:text-black">{a.name}</option>)}
+              </select>
+              <textarea placeholder="The Thought" className="w-full bg-transparent border-b border-zinc-300 dark:border-zinc-700 py-4 text-xl focus:border-indigo-500 outline-none transition-all h-24 resize-none" value={newQuote.text} onChange={(e) => setNewQuote({...newQuote, text: e.target.value})} required />
+              <button className="text-[10px] font-black uppercase tracking-widest text-emerald-500">Publish</button>
+           </form>
+        </section>
+
+      </main>
     </div>
   );
 }
